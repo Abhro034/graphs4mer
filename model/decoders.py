@@ -3,17 +3,19 @@ From https://github.com/HazyResearch/state-spaces
 Authors: albertfgu & krandiash
 """
 
+from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from einops import rearrange, reduce
 
 
-class Decoder(nn.Module):
-    """This class doesn't do much but just signals the interface that Decoders are expected to adhere to
-    TODO: is there a way to enforce the signature of the forward method?
+class Decoder(nn.Module, ABC):
+    """Base class that enforces the interface that Decoders are expected to adhere to.
+    Subclasses must implement the forward method with the specified signature.
     """
 
+    @abstractmethod
     def forward(self, x, **kwargs):
         """
         x: (batch, length, dim) input tensor
