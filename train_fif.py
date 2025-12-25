@@ -105,14 +105,35 @@ class Trainer:
 
             # Backward pass
             self.optimizer.zero_grad()
-            loss.backward()
 
-            # Check gradients for NaN
+            # Use anomaly detection for first few batches to catch issues early
+            if batch_idx < 5:
+                with torch.autograd.set_detect_anomaly(True):
+                    loss.backward()
+            else:
+                loss.backward()
+
+            # Check gradients for NaN and clip extreme values
+            max_grad_norm = 0.0
+            nan_grad_found = False
             for name, param in self.model.named_parameters():
                 if param.grad is not None:
+                    grad_norm = param.grad.norm().item()
+                    max_grad_norm = max(max_grad_norm, grad_norm)
+
                     if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
                         print(f"\n❌ NaN/Inf gradient in {name}")
-                        raise ValueError(f"NaN/Inf gradient in {name}")
+                        print(f"   Grad norm: {grad_norm}")
+                        print(f"   Param shape: {param.shape}")
+                        print(f"   Loss: cls={cls_loss.item():.4f}, reg={reg_loss.item():.4f}, total={loss.item():.4f}")
+                        nan_grad_found = True
+
+            if nan_grad_found:
+                raise ValueError("NaN/Inf gradient detected - stopping training")
+
+            # Print max gradient norm for first few batches
+            if batch_idx < 5:
+                print(f"Batch {batch_idx}: max_grad_norm = {max_grad_norm:.4f}, loss = {loss.item():.4f}")
 
             # Gradient clipping
             if self.config.get('grad_clip', None):
@@ -392,11 +413,11 @@ def main():
         'weight_decay': 1e-4,  # Reduced from 1e-3
         'grad_clip': 1.0,  # Reduced from 5.0 for more aggressive clipping
 
-        # Regularization weights
+        # Regularization weights (reduced to prevent gradient explosion)
         'reg_weights': {
-            'feature_smoothing': 0.01,
-            'degree': 0.01,
-            'sparse': 0.01
+            'feature_smoothing': 0.001,  # Reduced 10x
+            'degree': 0.001,             # Reduced 10x
+            'sparse': 0.001              # Reduced 10x
         },
 
         # Save
