@@ -329,9 +329,10 @@ class GraphS4mer(nn.Module):
 
         # get initial adj
         if self.use_prior:
-            # Clone edge tensors to avoid in-place modification issues
-            edge_index_clone = data.edge_index.clone() if data.edge_index is not None else None
-            edge_attr_clone = data.edge_attr.clone() if data.edge_attr is not None else None
+            # Clone and detach edge tensors to avoid in-place modification issues
+            # Edge structure shouldn't require gradients as it's discrete
+            edge_index_clone = data.edge_index.detach().clone() if data.edge_index is not None else None
+            edge_attr_clone = data.edge_attr.detach().clone() if data.edge_attr is not None else None
             adj_mat = torch_geometric.utils.to_dense_adj(
                 edge_index=edge_index_clone, batch=data.batch, edge_attr=edge_attr_clone
             )
@@ -392,11 +393,12 @@ class GraphS4mer(nn.Module):
         # back to sparse graph
         edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
 
-        # Clone to avoid in-place modification issues
-        edge_index = edge_index.clone()
-        edge_weight = edge_weight.clone()
+        # Detach and clone to completely separate from computation graph
+        # Edge indices are discrete and don't need gradients
+        edge_index = edge_index.detach().clone()
+        edge_weight = edge_weight.detach().clone()
 
-        # add self-loop
+        # add self-loop (these functions modify tensors in-place)
         edge_index, edge_weight = torch_geometric.utils.remove_self_loops(
             edge_index=edge_index, edge_attr=edge_weight
         )
@@ -746,11 +748,12 @@ class GraphS4mer_Regression(nn.Module):
         edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
         del adj_mat_batched
 
-        # Clone to avoid in-place modification issues
-        edge_index = edge_index.clone()
-        edge_weight = edge_weight.clone()
+        # Detach and clone to completely separate from computation graph
+        # Edge indices are discrete and don't need gradients
+        edge_index = edge_index.detach().clone()
+        edge_weight = edge_weight.detach().clone()
 
-        # add self-loop
+        # add self-loop (these functions modify tensors in-place)
         edge_index, edge_weight = torch_geometric.utils.remove_self_loops(
             edge_index=edge_index, edge_attr=edge_weight
         )

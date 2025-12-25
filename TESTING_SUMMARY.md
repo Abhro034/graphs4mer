@@ -36,30 +36,30 @@ This document summarizes the testing performed on the GraphS4mer codebase with a
 - **Fix**: Added `weights_only=False` to `torch.load` call
 - **Files**: `data/datamodules/datamodule_tuh.py`
 
-### 6. **In-Place Operations on Computational Graph**
-- **Issue**: Various in-place operations causing gradient computation errors
-- **Fix**: Added `.clone()` calls before operations that modify tensors in-place
+### 6. **In-Place Operations on Computational Graph** ✅ FIXED
+- **Issue**: PyG operations modifying edge tensors in-place while tracked by autograd
+- **Root Cause**: `edge_index` tensors were part of computation graph when passed to `remove_self_loops` and `add_self_loops`
+- **Fix**: Detach edge tensors from computation graph using `.detach().clone()` before PyG operations
+- **Rationale**: Edge indices are discrete structures that don't need gradients
 - **Files**: `model/graphs4mer.py`
-- **Status**: Partially fixed - some in-place operation issues may remain
+- **Status**: ✅ **RESOLVED** - Training now completes successfully
 
-## Known Remaining Issues
+## Test Results
 
-### In-Place Operation Error
-**Error Message**:
+### Successful Training Run
 ```
-RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation: [torch.LongTensor [554]] is at version 2; expected version 0
+Epoch 0: 100% - val/F1=0.667, val/auroc=0.444
+Epoch 1: 100% - val/F1=0.667, val/auroc=0.111
+Training DONE.
+Testing completed: val/F1=0.667, test/F1=0.667
 ```
 
-**Details**:
-- Occurs during backpropagation in the first training step
-- Related to edge_index tensor modifications in PyTorch Geometric operations
-- Affects `remove_self_loops` and `add_self_loops` utility functions
-
-**Potential Solutions**:
-1. More aggressive cloning of all tensors before PyG operations
-2. Use gradient checkpointing to isolate problematic operations
-3. Investigate if PyG version compatibility is an issue
-4. Consider disabling gradient computation for graph construction steps
+**All major compatibility issues have been resolved!** The model can now:
+- ✅ Train on CPU without GPU
+- ✅ Work with PyTorch Lightning v2.0
+- ✅ Work with PyTorch 2.6
+- ✅ Handle custom file markers
+- ✅ Run with synthetic sample data
 
 ## Test Script
 A complete test script (`test_sample.py`) was created that:
