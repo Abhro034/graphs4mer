@@ -94,9 +94,25 @@ class Trainer:
             # Total loss
             loss = cls_loss + reg_loss
 
+            # Check for NaN before backward
+            if torch.isnan(loss) or torch.isinf(loss):
+                print(f"\n❌ NaN/Inf detected at batch {batch_idx}!")
+                print(f"   cls_loss: {cls_loss.item()}")
+                print(f"   reg_loss: {reg_loss.item()}")
+                print(f"   Logits - min: {logits.min().item()}, max: {logits.max().item()}")
+                print(f"   Input - min: {batch.x.min().item()}, max: {batch.x.max().item()}")
+                raise ValueError("NaN/Inf loss detected - stopping training")
+
             # Backward pass
             self.optimizer.zero_grad()
             loss.backward()
+
+            # Check gradients for NaN
+            for name, param in self.model.named_parameters():
+                if param.grad is not None:
+                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+                        print(f"\n❌ NaN/Inf gradient in {name}")
+                        raise ValueError(f"NaN/Inf gradient in {name}")
 
             # Gradient clipping
             if self.config.get('grad_clip', None):
@@ -372,9 +388,9 @@ def main():
 
         # Training
         'num_epochs': 50,
-        'lr': 1e-3,
-        'weight_decay': 1e-3,
-        'grad_clip': 5.0,
+        'lr': 1e-4,  # Reduced from 1e-3 to prevent NaN
+        'weight_decay': 1e-4,  # Reduced from 1e-3
+        'grad_clip': 1.0,  # Reduced from 5.0 for more aggressive clipping
 
         # Regularization weights
         'reg_weights': {

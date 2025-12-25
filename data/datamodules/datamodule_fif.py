@@ -39,10 +39,26 @@ def process_subject_fif(fif_path):
     else:
         sleep_stages = np.array([stage_map.get(int(s), int(s)) for s in sleep_stages])
 
-    # Normalize each epoch
+    # Normalize each epoch with robust handling
     normalized_eeg = []
     for epoch in patient_eeg:
-        normalized_epoch = (epoch - epoch.mean(axis=1, keepdims=True)) / (epoch.std(axis=1, keepdims=True) + 1e-8)
+        # Check for invalid values first
+        if np.isnan(epoch).any() or np.isinf(epoch).any():
+            print(f"WARNING: Found NaN/Inf in epoch data before normalization")
+            # Replace NaN/Inf with median
+            epoch = np.nan_to_num(epoch, nan=np.nanmedian(epoch), posinf=np.nanmedian(epoch), neginf=np.nanmedian(epoch))
+
+        # Per-channel normalization with robust epsilon
+        mean = epoch.mean(axis=1, keepdims=True)
+        std = epoch.std(axis=1, keepdims=True)
+
+        # Use larger epsilon and clip extreme values
+        epsilon = 1e-6
+        normalized_epoch = (epoch - mean) / (std + epsilon)
+
+        # Clip to prevent extreme values
+        normalized_epoch = np.clip(normalized_epoch, -10, 10)
+
         normalized_eeg.append(normalized_epoch)
 
     patient_eeg = np.array(normalized_eeg, dtype=np.float32)
