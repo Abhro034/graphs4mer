@@ -65,13 +65,16 @@ def get_knn_graph(x, k, dist_measure="cosine", undirected=True):
 
     if dist_measure == "euclidean":
         dist = torch.cdist(x, x, p=2.0)
-        dist = (dist - dist.min()) / (dist.max() - dist.min())
+        # Prevent division by zero in normalization
+        dist_range = dist.max() - dist.min()
+        dist = (dist - dist.min()) / (dist_range + 1e-8)
         knn_val, knn_ind = torch.topk(
             dist, k, dim=-1, largest=False
         )  # smallest distances
     elif dist_measure == "cosine":
         norm = torch.norm(x, dim=-1, p="fro")[:, :, None]
-        x_norm = x / norm
+        # Prevent division by zero
+        x_norm = x / (norm + 1e-8)
         dist = torch.matmul(x_norm, x_norm.transpose(1, 2))
         knn_val, knn_ind = torch.topk(
             dist, k, dim=-1, largest=True
@@ -475,9 +478,13 @@ class GraphS4mer(nn.Module):
 
         if "degree" in self.regularizations:
             ones = torch.ones(batch, num_nodes, 1).to(x.device)
+            # Add epsilon to prevent log(0) = -inf
+            degree_sum = torch.matmul(adj, ones)
             curr_loss = -(1 / n) * torch.matmul(
-                ones.transpose(1, 2), torch.log(torch.matmul(adj, ones))
+                ones.transpose(1, 2), torch.log(degree_sum + 1e-8)
             ).squeeze(-1).squeeze(-1)
+            # Clamp to prevent extreme values
+            curr_loss = torch.clamp(curr_loss, min=-100, max=100)
             if reduce == "mean":
                 loss["degree"] = torch.mean(curr_loss)
             elif reduce == "sum":
@@ -812,9 +819,13 @@ class GraphS4mer_Regression(nn.Module):
 
         if "degree" in self.regularizations:
             ones = torch.ones(batch, num_nodes, 1).to(x.device)
+            # Add epsilon to prevent log(0) = -inf
+            degree_sum = torch.matmul(adj, ones)
             curr_loss = -(1 / n) * torch.matmul(
-                ones.transpose(1, 2), torch.log(torch.matmul(adj, ones))
+                ones.transpose(1, 2), torch.log(degree_sum + 1e-8)
             ).squeeze(-1).squeeze(-1)
+            # Clamp to prevent extreme values
+            curr_loss = torch.clamp(curr_loss, min=-100, max=100)
             if reduce == "mean":
                 loss["degree"] = torch.mean(curr_loss)
             elif reduce == "sum":
