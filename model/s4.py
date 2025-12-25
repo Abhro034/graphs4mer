@@ -12,7 +12,19 @@ from scipy import special as ss
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from pytorch_lightning.utilities import rank_zero_only
+
+# PyTorch Lightning v2.0 compatibility: rank_zero_only moved to rank_zero module
+try:
+    from pytorch_lightning.utilities.rank_zero import rank_zero_only
+except ImportError:
+    # Fallback for older versions
+    try:
+        from pytorch_lightning.utilities import rank_zero_only
+    except ImportError:
+        # If neither works, create a dummy decorator
+        def rank_zero_only(fn):
+            return fn
+
 from einops import rearrange, repeat
 import opt_einsum as oe
 from model.decoders import SequenceDecoder
