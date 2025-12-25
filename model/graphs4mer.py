@@ -37,13 +37,15 @@ def calculate_normalized_laplacian(adj):
     batch, num_nodes, _ = adj.shape
     d = adj.sum(-1)  # (batch, num_nodes)
 
-    # Clamp degree to prevent gradient explosion in pow operation
-    # Gradient of d^(-0.5) = -0.5 * d^(-1.5) explodes when d is small
-    d = torch.clamp(d, min=1e-4)  # Ensure minimum degree for stable gradients
+    # Use reciprocal sqrt instead of pow for better numerical stability
+    # Avoid pow(d, -0.5) which has gradient = -0.5 * d^(-1.5) that explodes
+    # Use 1/sqrt(d + eps) which has better behaved gradients
+    epsilon = 1e-3
+    d_inv_sqrt = 1.0 / torch.sqrt(d + epsilon)
 
-    d_inv_sqrt = torch.pow(d, -0.5)
-    # Note: torch.where below is now less necessary but kept for safety
-    d_inv_sqrt = torch.where(torch.isinf(d_inv_sqrt), torch.zeros_like(d_inv_sqrt), d_inv_sqrt)
+    # Clamp to prevent any extreme values
+    d_inv_sqrt = torch.clamp(d_inv_sqrt, max=100.0)
+
     d_mat_inv_sqrt = torch.diag_embed(d_inv_sqrt)  # (batch, num_nodes, num_nodes)
 
     identity = (torch.eye(num_nodes).unsqueeze(0).repeat(batch, 1, 1)).to(
