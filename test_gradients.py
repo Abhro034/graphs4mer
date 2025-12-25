@@ -39,15 +39,33 @@ def test_forward_backward():
     # Create model
     print("\n2. Creating model...")
     model = GraphS4mer(
+        input_dim=1,
         num_nodes=num_nodes,
-        num_classes=5,
+        dropout=0.1,
+        g_conv='gine',
+        num_gnn_layers=1,
+        hidden_dim=64,  # Smaller for testing
         max_seq_len=max_seq_len,
         resolution=max_seq_len,
-        hidden_dim=64,  # Smaller for testing
-        num_gnn_layers=1,
         num_temporal_layers=2,  # Fewer layers
         state_dim=32,  # Smaller state
-        dropout=0.1
+        channels=1,
+        temporal_model='s4',
+        bidirectional=False,
+        temporal_pool='last',
+        prenorm=False,
+        postact=None,
+        metric='self_attention',
+        adj_embed_dim=16,
+        gin_mlp=True,
+        train_eps=True,
+        prune_method='thresh',
+        edge_top_perc=0.5,
+        activation_fn='relu',
+        num_classes=5,
+        undirected_graph=True,
+        use_prior=False,
+        regularizations=['feature_smoothing', 'degree', 'sparse']
     )
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
