@@ -73,7 +73,7 @@ class GraphLearner(nn.Module):
             attention = torch.matmul(context_norm, context_norm.transpose(-1, -2)).mean(
                 0
             )
-            attention[attention < 0] = 0
+            attention = torch.clamp(attention, min=0)
 
             # optional masking
             markoff_value = 0
@@ -106,7 +106,7 @@ class GraphLearner(nn.Module):
             attention = torch.matmul(context_norm, context_norm.transpose(-1, -2)).mean(
                 0
             )
-            attention[attention < 0] = 0
+            attention = torch.clamp(attention, min=0)
 
             # optional masking
             markoff_value = 0

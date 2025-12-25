@@ -37,7 +37,7 @@ def calculate_normalized_laplacian(adj):
     batch, num_nodes, _ = adj.shape
     d = adj.sum(-1)  # (batch, num_nodes)
     d_inv_sqrt = torch.pow(d, -0.5)
-    d_inv_sqrt[torch.isinf(d_inv_sqrt)] = 0.0
+    d_inv_sqrt = torch.where(torch.isinf(d_inv_sqrt), torch.zeros_like(d_inv_sqrt), d_inv_sqrt)
     d_mat_inv_sqrt = torch.diag_embed(d_inv_sqrt)  # (batch, num_nodes, num_nodes)
 
     identity = (torch.eye(num_nodes).unsqueeze(0).repeat(batch, 1, 1)).to(
