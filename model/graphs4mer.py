@@ -79,7 +79,8 @@ def get_knn_graph(x, k, dist_measure="cosine", undirected=True):
     else:
         raise NotImplementedError
 
-    adj_mat = (torch.ones_like(dist) * 0).scatter_(-1, knn_ind, knn_val).to(x.device)
+    # Use scatter instead of scatter_ to avoid in-place operation
+    adj_mat = torch.zeros_like(dist).scatter(-1, knn_ind, knn_val).to(x.device)
 
     adj_mat = torch.clamp(adj_mat, min=0.0)  # remove negatives
 
@@ -91,9 +92,10 @@ def get_knn_graph(x, k, dist_measure="cosine", undirected=True):
         torch.eye(adj_mat.shape[-1], adj_mat.shape[-1])
         .unsqueeze(0)
         .repeat(adj_mat.shape[0], 1, 1)
-        .to(bool)
     ).to(x.device)
-    adj_mat = adj_mat * (~I) + I
+    # Clone to avoid in-place operation issues
+    adj_mat_no_self = adj_mat * (~I.to(bool))
+    adj_mat = adj_mat_no_self + I
 
     # to sparse graph
     edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
@@ -327,8 +329,11 @@ class GraphS4mer(nn.Module):
 
         # get initial adj
         if self.use_prior:
+            # Clone edge tensors to avoid in-place modification issues
+            edge_index_clone = data.edge_index.clone() if data.edge_index is not None else None
+            edge_attr_clone = data.edge_attr.clone() if data.edge_attr is not None else None
             adj_mat = torch_geometric.utils.to_dense_adj(
-                edge_index=data.edge_index, batch=data.batch, edge_attr=data.edge_attr
+                edge_index=edge_index_clone, batch=data.batch, edge_attr=edge_attr_clone
             )
         else:
             # knn cosine graph
@@ -386,6 +391,10 @@ class GraphS4mer(nn.Module):
 
         # back to sparse graph
         edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
+
+        # Clone to avoid in-place modification issues
+        edge_index = edge_index.clone()
+        edge_weight = edge_weight.clone()
 
         # add self-loop
         edge_index, edge_weight = torch_geometric.utils.remove_self_loops(
@@ -736,6 +745,10 @@ class GraphS4mer_Regression(nn.Module):
         adj_mat = torch.cat(adj_mat_batched, dim=1).reshape(batch * seq_len, num_nodes, num_nodes) # (batch*seq_len, num_nodes, num_nodes)
         edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
         del adj_mat_batched
+
+        # Clone to avoid in-place modification issues
+        edge_index = edge_index.clone()
+        edge_weight = edge_weight.clone()
 
         # add self-loop
         edge_index, edge_weight = torch_geometric.utils.remove_self_loops(

@@ -213,14 +213,26 @@ class PLModel(pl.LightningModule):
 
         logits, y, cls_loss, reg_loss, file_names, _, _, _ = self._shared_step(batch)
 
-        return {
+        output = {
             "labels": y,
             "logits": logits,
             "reg_loss": reg_loss,
             "file_names": file_names,
         }
 
-    def validation_epoch_end(self, outputs):
+        # Store outputs for epoch end
+        if not hasattr(self, '_validation_outputs'):
+            self._validation_outputs = []
+        self._validation_outputs.append(output)
+
+        return output
+
+    def on_validation_epoch_end(self):
+        # Get outputs from instance attributes (set in validation_step)
+        if not hasattr(self, '_validation_outputs') or len(self._validation_outputs) == 0:
+            return
+
+        outputs = self._validation_outputs
         logits = torch.cat([output["logits"] for output in outputs]).squeeze()
         labels = torch.cat([output["labels"] for output in outputs]).squeeze()
 
@@ -288,6 +300,9 @@ class PLModel(pl.LightningModule):
             sync_dist=True,
         )
 
+        # Clear outputs for next epoch
+        self._validation_outputs = []
+
     def test_step(self, batch, batch_idx, dataloader_idx=0):
 
         # assumes validation loader first, then test loader
@@ -303,7 +318,8 @@ class PLModel(pl.LightningModule):
             adj_mat_learned,
             features
         ) = self._shared_step(batch)
-        return {
+
+        output = {
             "labels": y,
             "logits": logits,
             "prefix": prefix,
@@ -311,12 +327,29 @@ class PLModel(pl.LightningModule):
             "raw_attn_weight": raw_attn_weight,
             "adj_mat_learned": adj_mat_learned,
             "features": features,
+            "dataloader_idx": dataloader_idx,
         }
 
-    def test_epoch_end(self, outputs):
+        # Store outputs for epoch end
+        if not hasattr(self, '_test_outputs'):
+            self._test_outputs = {}
+        if dataloader_idx not in self._test_outputs:
+            self._test_outputs[dataloader_idx] = []
+        self._test_outputs[dataloader_idx].append(output)
+
+        return output
+
+    def on_test_epoch_end(self):
+        # Get outputs from instance attributes
+        if not hasattr(self, '_test_outputs') or len(self._test_outputs) == 0:
+            return
+
         thresholds = None
         find_threshold = False
         find_threshold_on = None
+
+        # Convert dict of outputs to list format expected by original code
+        outputs = [self._test_outputs[idx] for idx in sorted(self._test_outputs.keys())]
 
         for curr_outputs in outputs:
             logits = torch.cat([output["logits"] for output in curr_outputs]).squeeze()
@@ -424,6 +457,9 @@ class PLModel(pl.LightningModule):
                     "wb",
                 ) as pf:
                     pickle.dump(outputs_dict, pf)
+
+        # Clear outputs
+        self._test_outputs = {}
 
     def _shared_step(self, batch, batch_idx=None):
         y = batch.y
@@ -596,6 +632,7 @@ def main(args):
             standardize=True,
             balanced_sampling=args.balanced_sampling,
             pin_memory=True,
+            file_marker_dir=args.file_marker_dir,
         )
     elif args.dataset == "icbeb":
         datamodule = ICBEB_DataModule(
@@ -674,9 +711,14 @@ def main(args):
 
         lr_monitor = LearningRateMonitor(logging_interval="step")
 
+        # Determine accelerator based on GPU availability
+        use_gpu = args.gpus > 0 and torch.cuda.is_available()
+        accelerator = "gpu" if use_gpu else "cpu"
+        devices = args.gpu_id if use_gpu else 1
+
         if not (args.gpus > 1):
             trainer = pl.Trainer(
-                accelerator="gpu",
+                accelerator=accelerator,
                 max_epochs=args.num_epochs,
                 max_steps=-1,
                 enable_progress_bar=True,
@@ -687,13 +729,13 @@ def main(args):
                 ],
                 benchmark=False,
                 num_sanity_val_steps=0,
-                devices=args.gpu_id,  # default to 1 GPU
+                devices=devices,
                 accumulate_grad_batches=args.accumulate_grad_batches,
             )
         else:
             # distributed data parallel
             trainer = pl.Trainer(
-                accelerator="gpu",
+                accelerator=accelerator,
                 strategy=pl.strategies.DDPSpawnStrategy(
                     find_unused_parameters=False
                 ),
@@ -723,9 +765,14 @@ def main(args):
         )
 
     else:
+        # Determine accelerator for testing
+        use_gpu = args.gpus > 0 and torch.cuda.is_available()
+        accelerator = "gpu" if use_gpu else "cpu"
+        devices = args.gpu_id if use_gpu else 1
+
         trainer = pl.Trainer(
-            accelerator="gpu",
-            devices=args.gpu_id,
+            accelerator=accelerator,
+            devices=devices,
         )
 
         trainer.test(

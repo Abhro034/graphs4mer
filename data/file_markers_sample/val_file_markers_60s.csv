@@ -1,0 +1,7 @@
+file_name,clip_index,is_seizure
+val_000.h5,0,1
+val_000.h5,1,1
+val_001.h5,0,0
+val_001.h5,1,0
+val_002.h5,0,0
+val_002.h5,1,1

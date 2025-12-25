@@ -129,7 +129,7 @@ class TUHDataset(InMemoryDataset):
 
         writeout_fn = h5_file_name.split(".h5")[0] + "_" + str(clip_idx)
 
-        data = torch.load(os.path.join(self.processed_dir, "{}.pt".format(writeout_fn)))
+        data = torch.load(os.path.join(self.processed_dir, "{}.pt".format(writeout_fn)), weights_only=False)
 
         if self.scaler is not None:
             # standardize
@@ -154,6 +154,7 @@ class TUH_DataModule(pl.LightningDataModule):
         standardize=True,
         balanced_sampling=False,
         pin_memory=False,
+        file_marker_dir=None,
     ):
         super().__init__()
 
@@ -169,11 +170,14 @@ class TUH_DataModule(pl.LightningDataModule):
         self.balanced_sampling = balanced_sampling
         self.pin_memory = pin_memory
 
+        # Use custom file marker directory if provided, otherwise use default
+        marker_dir = file_marker_dir if file_marker_dir is not None else FILEMARKER_DIR
+
         self.file_markers = {}
         for split in ["train", "val", "test"]:
             self.file_markers[split] = pd.read_csv(
                 os.path.join(
-                    FILEMARKER_DIR, "{}_file_markers_{}s.csv".format(split, seq_len),
+                    marker_dir, "{}_file_markers_{}s.csv".format(split, seq_len),
                 ),
             )
 
@@ -250,7 +254,7 @@ class TUH_DataModule(pl.LightningDataModule):
             batch_size=self.train_batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            persistent_workers=True,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
         return train_dataloader
 
@@ -262,7 +266,7 @@ class TUH_DataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            persistent_workers=True,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
         return val_dataloader
 
@@ -274,7 +278,7 @@ class TUH_DataModule(pl.LightningDataModule):
             batch_size=self.test_batch_size,
             num_workers=self.num_workers,
             pin_memory=self.pin_memory,
-            persistent_workers=True,
+            persistent_workers=True if self.num_workers > 0 else False,
         )
         return test_dataloader
 

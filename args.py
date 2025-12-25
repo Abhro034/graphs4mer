@@ -88,6 +88,12 @@ def get_args():
         help="Dir to preprocessed freatures.",
     )
     parser.add_argument(
+        "--file_marker_dir",
+        type=str,
+        default=None,
+        help="Dir to file markers (CSV files with train/val/test splits).",
+    )
+    parser.add_argument(
         "--max_seq_len",
         type=int,
         default=None,
