@@ -80,7 +80,7 @@ class GraphLearner(nn.Module):
             if attn_mask is not None:
                 if len(attn_mask.shape) == 2:
                     attn_mask = attn_mask.unsqueeze(0)
-                attention = attention.masked_fill_(
+                attention = attention.masked_fill(
                     torch.logical_not(attn_mask.bool()), markoff_value
                 )
 
@@ -95,7 +95,7 @@ class GraphLearner(nn.Module):
             if attn_mask is not None:
                 if len(attn_mask.shape) == 2:
                     attn_mask = attn_mask.unsqueeze(0)
-                attention = attention.masked_fill_(
+                attention = attention.masked_fill(
                     torch.logical_not(attn_mask.bool()), markoff_value
                 )
 
@@ -113,7 +113,7 @@ class GraphLearner(nn.Module):
             if attn_mask is not None:
                 if len(attn_mask.shape) == 2:
                     attn_mask = attn_mask.unsqueeze(0)
-                attention = attention.masked_fill_(
+                attention = attention.masked_fill(
                     torch.logical_not(attn_mask.bool()), markoff_value
                 )
 
@@ -131,7 +131,7 @@ class GraphLearner(nn.Module):
             if attn_mask is not None:
                 if len(attn_mask.shape) == 2:
                     attn_mask = attn_mask.unsqueeze(0)
-                attention = attention.masked_fill_(
+                attention = attention.masked_fill(
                     torch.logical_not(attn_mask.bool()), markoff_value
                 )
 

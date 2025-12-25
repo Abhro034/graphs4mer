@@ -96,7 +96,9 @@ def get_knn_graph(x, k, dist_measure="cosine", undirected=True):
     adj_mat = adj_mat * (~I) + I
 
     # to sparse graph
-    edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
+    # Detach and clone to avoid in-place modification issues
+    adj_mat_for_sparse = adj_mat.detach().clone().requires_grad_(True)
+    edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat_for_sparse)
 
     return edge_index, edge_weight, adj_mat
 
@@ -385,7 +387,10 @@ class GraphS4mer(nn.Module):
         reg_losses = self.regularization_loss(x, adj=adj_mat)
 
         # back to sparse graph
-        edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
+        # Detach and clone adj_mat to avoid in-place modification issues
+        # We don't need gradients through the sparse conversion itself
+        adj_mat_for_sparse = adj_mat.detach().clone().requires_grad_(True)
+        edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat_for_sparse)
 
         # add self-loop
         edge_index, edge_weight = torch_geometric.utils.remove_self_loops(
@@ -734,7 +739,9 @@ class GraphS4mer_Regression(nn.Module):
         for t in range(num_dynamic_graphs):
             adj_mat_batched.append(adj_mat[:, t, :, :].repeat(1, self.resolution, 1, 1))
         adj_mat = torch.cat(adj_mat_batched, dim=1).reshape(batch * seq_len, num_nodes, num_nodes) # (batch*seq_len, num_nodes, num_nodes)
-        edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat)
+        # Detach and clone adj_mat to avoid in-place modification issues
+        adj_mat_for_sparse = adj_mat.detach().clone().requires_grad_(True)
+        edge_index, edge_weight = torch_geometric.utils.dense_to_sparse(adj_mat_for_sparse)
         del adj_mat_batched
 
         # add self-loop
