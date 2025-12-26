@@ -25,6 +25,11 @@ def process_subject_fif(fif_path):
     raw = mne.read_epochs(fif_path, preload=True, verbose=False)
     patient_eeg = raw.get_data()  # (n_epochs, n_channels, n_timepoints)
 
+    # Truncate to 3000 samples (3001 is prime, can't be divided evenly)
+    # 3000 has many divisors (300, 250, 200, 150, etc.) for flexible resolution
+    if patient_eeg.shape[2] > 3000:
+        patient_eeg = patient_eeg[:, :, :3000]
+
     # Get ADHD label
     if hasattr(raw, 'metadata') and raw.metadata is not None and 'ADHD' in raw.metadata.columns:
         label = raw.metadata['ADHD'].iloc[0]
