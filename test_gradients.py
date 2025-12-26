@@ -38,6 +38,19 @@ def test_forward_backward():
 
     # Create model
     print("\n2. Creating model...")
+
+    # Use a resolution that divides max_seq_len
+    # If max_seq_len is 3000, use 300 (gives 10 graphs)
+    # If max_seq_len is 3001, it will fail - need truncation
+    if max_seq_len == 3001:
+        print("   ⚠️  WARNING: max_seq_len=3001 (prime number)")
+        print("   ⚠️  This will fail! Need to restart kernel to reload truncated data.")
+        resolution = 3001  # Use full seq to avoid error, but will be slow
+    else:
+        resolution = 300  # Use efficient resolution
+
+    print(f"   Using resolution={resolution} for max_seq_len={max_seq_len}")
+
     model = GraphS4mer(
         input_dim=1,
         num_nodes=num_nodes,
@@ -46,7 +59,7 @@ def test_forward_backward():
         num_gnn_layers=1,
         hidden_dim=64,  # Smaller for testing
         max_seq_len=max_seq_len,
-        resolution=max_seq_len,
+        resolution=resolution,  # Use calculated resolution
         num_temporal_layers=2,  # Fewer layers
         state_dim=32,  # Smaller state
         channels=1,
