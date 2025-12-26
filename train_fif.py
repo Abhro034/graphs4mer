@@ -106,34 +106,19 @@ class Trainer:
             # Backward pass
             self.optimizer.zero_grad()
 
-            # Use anomaly detection for first few batches to catch issues early
-            if batch_idx < 5:
+            # Use anomaly detection only for very first batch
+            if batch_idx == 0 and epoch == 0:
                 with torch.autograd.set_detect_anomaly(True):
                     loss.backward()
             else:
                 loss.backward()
 
-            # Check gradients for NaN and clip extreme values
-            max_grad_norm = 0.0
-            nan_grad_found = False
-            for name, param in self.model.named_parameters():
-                if param.grad is not None:
-                    grad_norm = param.grad.norm().item()
-                    max_grad_norm = max(max_grad_norm, grad_norm)
-
-                    if torch.isnan(param.grad).any() or torch.isinf(param.grad).any():
+            # Quick NaN check (only for first batch per epoch)
+            if batch_idx == 0:
+                for name, param in self.model.named_parameters():
+                    if param.grad is not None and (torch.isnan(param.grad).any() or torch.isinf(param.grad).any()):
                         print(f"\n❌ NaN/Inf gradient in {name}")
-                        print(f"   Grad norm: {grad_norm}")
-                        print(f"   Param shape: {param.shape}")
-                        print(f"   Loss: cls={cls_loss.item():.4f}, reg={reg_loss.item():.4f}, total={loss.item():.4f}")
-                        nan_grad_found = True
-
-            if nan_grad_found:
-                raise ValueError("NaN/Inf gradient detected - stopping training")
-
-            # Print max gradient norm for first few batches
-            if batch_idx < 5:
-                print(f"Batch {batch_idx}: max_grad_norm = {max_grad_norm:.4f}, loss = {loss.item():.4f}")
+                        raise ValueError("NaN/Inf gradient detected")
 
             # Gradient clipping
             if self.config.get('grad_clip', None):
@@ -400,11 +385,11 @@ def main():
         'batch_size': 32,
         'num_workers': 4,
 
-        # Model
+        # Model (optimized for speed)
         'hidden_dim': 128,
         'num_gnn_layers': 1,
-        'num_temporal_layers': 4,
-        'state_dim': 64,
+        'num_temporal_layers': 2,  # Reduced from 4 for faster training
+        'state_dim': 32,  # Reduced from 64 for faster training
         'dropout': 0.1,
 
         # Training
@@ -460,7 +445,7 @@ def main():
         num_gnn_layers=config['num_gnn_layers'],
         hidden_dim=config['hidden_dim'],
         max_seq_len=datamodule.max_seq_len,
-        resolution=datamodule.max_seq_len,  # Use full sequence as one graph
+        resolution=300,  # Split 3001 samples into ~10 graphs (much faster!)
         num_temporal_layers=config['num_temporal_layers'],
         state_dim=config['state_dim'],
         channels=1,
