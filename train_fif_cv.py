@@ -63,10 +63,16 @@ class FIFDatasetCV(Dataset):
         self.n_samples = first_data.shape[2]
         self.n_classes = 5  # Sleep stages
 
-    def len(self):
+    def __len__(self):
+        """Return number of epochs"""
         return len(self.epoch_to_subject)
 
+    def __getitem__(self, idx):
+        """Get item by index - PyTorch Geometric compatibility"""
+        return self.get(idx)
+
     def get(self, idx):
+        """Get single epoch data"""
         subj_idx = self.epoch_to_subject[idx]
         epoch_idx = self.epoch_indices[idx]
 
